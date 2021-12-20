@@ -1,0 +1,143 @@
+---
+title: "Proyecto HABI"
+author: "Daniel felipe carrascal"
+date: "12/19/2021"
+output: html_notebook
+theme: journal
+df_print: paged
+  
+toc: true
+number_sections: true
+---
+## Quarterly Results {.tabset}
+
+### Limpieza
+
+(tab content)
+
+### Analisis
+```{r setup, echo=FALSE}
+
+```
+
+## INFORME PROYECTO HABI
+
+
+La base de datos Habi es una base de datos relacional; la cual cuenta con 244.000 inmuebles(columnas) y 32 variables(caracteristicas).El principal objetivo es explorar como es el comportamiento del precio con diferentes variables por lo que hemos elegido de las 32 variables las que en primera medida se consideran mas importantes en la estimación del valor de venta
+
+### Variables
+
+De las 32 variables que tenemos en el df hemos elegido las 10 variables que en primer analisis consideramos mas importantes y mass representativos en la relación con el valor de inmueble:
+
+- valorventa,estrato,area,habitaciones,vista,tipo inueble.,latitud y longitud.
+
+Antes de inciar el analisis y solución de las hipotesis hemos destinado un apartado en la limpieza y transformación de datos, a causa de varias inconsistencias en los datos que no permiten la verasidad y el adecuado manejo de datos:
+
+### Limpieza de datos 
+Al revisar la df hemos encontrado :
+
+-Corregir/convertir NAN en 0 (presentes en 22 de las 32 variables)
+```{r}
+mutate_all(train_data_final_copia, ~replace(., is.na(.), 0))
+```
+
+-Corregir anomalias y datos que no son posibles(posibles data corrupción, errores de input o no han sido especificados) aqui encontramos:
+
+  -Variable area inmueble= 0
+  -Estrato socieconómico=0
+```{r}
+df_nuevo=train_data_final_copia
+
+df_nuevo=df_nuevo %>% filter(area != 0 , estrato > 0)
+```
+  
+-Presencia de gran cantidad de outliers,en varias variables que determinamos importantes
+```{r}
+prueba=df_nuevo %>% filter(valorventa>=quantile(valorventa)[2] ,
+                           valorventa<=quantile(valorventa)[4] ,
+                           area>=quantile(area)[2],
+                           area<=quantile(area)[4])
+```
+
+Con lo anterior hemos corregido los errores y ademas hemos disminuido los datos a analizar gracias a los fritos, en este caso es necesario y permitira como lo veremos mas adelante ver el antes y el despues
+    -> Hemos filtrado y retirado de la df inicial 156532 datos, obteniendo 87.956 inmuebles
+```{r echo=FALSE}
+dim(df_nuevo)-dim(prueba)
+```
+
+## Analisis de datos y desarrollo hipotesis
+
+Ya habiendo preparado la DF podemos iniciar con las hipotesis y el analisis respectivo de los datos:
+	
+	###### creacón de histograma con la distribucion de los inmuebles
+```{r}
+hist(x=prueba$valorventa)
+```
+	
+**la primer hipotesis consiste en determinar si existe una correlacion positiva entre valor de venta de los inmuebles , los estratos socioeconomicos y el area del inmueble**; para eso hemos creado un mapa de dispersion en el cual relaciona el area del inmueble con el precio del inmueble, si bien por la densidad de los datos puede el analisis no ser claro al agregar el atributo estrato, se comprueba como a mayor area y mayor estrato tendra un mayor valor de venta, asi mismo podemos concluir :
+
+
+```{r}
+library(ggplot2)
+
+ggplot(prueba,aes(x=valorventa,y=area,color=as.factor(estrato)))+geom_point()
+```
+
+**podemos ver que el estrato 3 y 4 podria considerarse de los mejores para comprar inmueble debido a que se pueden encontrar inmuebles grandes a un precio considerablemente más económico con estratos 5 y 6, en donde al mismo precio se encuentra casi a la mitad del area **
+
+```{r }
+distri_grouparea1=prueba %>% mutate(grupos_areas=ifelse(area<80,"menor 80",
+                                                       ifelse(area<100,"entre 80 y 100", 
+                                                              ifelse(area<140,"entre 100                                                                                   y 140",
+                                                                "mayores 140"))))
+```
+
+Aqui hemos creado intervalos que nos ayuden a distinguir el tamaño de los inmuebles, haciendo 4 grupos, lo que compararemos el promedio de precio de inmuebles con esos tamaños
+```{r}
+distri_grouparea=distri_grouparea1 %>% 
+  group_by(grupos_areas) %>%  
+  summarise(mean_precio=round(mean(valorventa)/1000,2) ) 
+distri_grouparea
+```
+### vista
+Las personas suelen escoger lugares que puedan tener vista exterior, ya sea por el sol, por gusto o porque generalmente no tiene otro edificio al frente, teniendo en cuenta lo anterior existe un cambio en el comportamiento del precio en un inmueble con vista externa? es mas costos o no tiene alteracíon 
+
+```{r}
+boxplot(prueba$valorventa ~ prueba$vista ,
+ col = c("#FFE0B2", "#FFA726", "#F57C00"))
+
+```
+
+la media de precios de los inmuebles con vista exterior si se encuentra por encima que los que no tienen o los que tienen vista interior por lo que la hipotesis es correcta, también encontramos que los inmuebles con vista interior tienen bastantes datos atipicos por lo que posiblemente cuenten con otras caracteristicas que influyan mas que esta.
+### resumen de variable dicotomicas
+La principales caracteristicas de una variable cualitativa binaria o dicotomica consiste en tomar valor de 0= "no tiene"  o 1 =tiene la caractersitica. estas variables nos ayudan a definir si el inmueble cuenta con la caracteristicas  posiblemente tendra un mayor precio que si no.
+
+""sera esto cierto?!""
+
+## Remodelado
+
+```{r}
+sum_var_remodelado=prueba %>% group_by(remodelado) %>% 
+  summarise(mean_precio=round(mean(valorventa)/1000,2),
+            cantidad_inmuebles=n()
+            ) 
+```
+```{r}
+sum_var_remodelado
+```
+
+El precio de un inmueble remodelado tiene un promedio mayor que los que no tambien es interesante revisar la cantidad de inmuebles remodelados y no remodelados
+## Estudio
+
+```{r}
+sum_var_estudio=prueba %>% group_by(estudio) %>% 
+  summarise(mean_precio=round(mean(valorventa)/1000,2),
+            cantidad_inmuebles=n()
+  ) 
+```
+```{r}
+sum_var_estudio
+```
+
+En conclusión hemos podido ver y analizar las variables y su comportamiento, y queda por explorar y la necesidad de encontrar mas insights pero se ha construido el analisis en donde podemos verificar que el precio si esta regido por variables como el estrato, el area tio de vista, si esta o no remodelado etc
+
